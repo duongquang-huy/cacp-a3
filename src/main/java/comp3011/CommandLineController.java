@@ -98,9 +98,9 @@ public class CommandLineController {
                 processors.add(new FrameBlackAndWhiter());   
             } else if ("-y".equals(arg) || "--yellow-frames".equals(arg)) {
                 processors.add(new FrameYellower()); 
-            } else if ("-v".equals(arg) || "--vignette-frame".equals(arg)) {
+            } else if ("-v".equals(arg) || "--vignette-frames".equals(arg)) {
                 processors.add(new FrameVignetter()); 
-            } else if ("-d".equals(arg) || "--dust-frame".equals(arg)) {
+            } else if ("-d".equals(arg) || "--dust-frames".equals(arg)) {
                 processors.add(new FrameDuster()); 
             } else if ("-j".equals(arg) || "--jitter-frames".equals(arg)) {
                 processors.add(new FrameJitterer());
@@ -109,7 +109,12 @@ public class CommandLineController {
             } else if ("-b".equals(arg) || "--bleed-frames".equals(arg)) {
                 processors.add(new FrameBleeder()); 
             } else if ("-p".equals(arg) || "--pepper-frames".equals(arg)) {
-                processors.add(new FramePepperer());  
+                processors.add(new FramePepperer());
+            } else if (arg.startsWith("-") && arg.length() > 2 && !arg.startsWith("--")) {
+                // Combined short flags: -sfbn = -s -f -b -n
+                for (int i = 1; i < arg.length(); i++) {
+                    parseSingleFlag("-" + arg.charAt(i));
+                }
             } else if (arg.startsWith("-")) {
                 errorMessage = "Unknown option: " + arg;
             } else {
@@ -157,8 +162,8 @@ public class CommandLineController {
         System.out.println("  -f, --flicker-frames   Randomly dim frames");
         System.out.println("  -w, --black-and-white  Convert frames to black and white");
         System.out.println("  -y, --yellow-frames    Apply a warmer colour temperature");
-        System.out.println("  -v, --vignette-frame   Darken the frame edges");
-        System.out.println("  -d, --dust-frame       Render dust and hair marks");
+        System.out.println("  -v, --vignette-frames  Darken the frame edges");
+        System.out.println("  -d, --dust-frames      Render dust and hair marks");
         System.out.println("  -j, --jitter-frames    Randomly displace frames by a few pixels");
         System.out.println("  -m, --mottle-frames    Add cloudy emulsion mottling");
         System.out.println("  -b, --bleed-frames     Bleed light into frames");
@@ -172,5 +177,27 @@ public class CommandLineController {
     // Returns the list of frame processors on the command line
     public List<FrameProcessor> getFrameProcessors(){
     	return processors;
+    }
+    
+    private void parseSingleFlag(String flag) {
+        switch (flag) {
+            case "-h", "--help"           -> helpRequested = true;
+            case "-a", "--audio"          -> audioRequested = true;
+            case "-x", "--maximise"       -> maximiseRequested = true;
+            case "-1", "--monitor-1"      -> setDisplayId(1);
+            case "-2", "--monitor-2"      -> setDisplayId(2);
+            case "-n", "--number-frames"  -> processors.add(new FrameNumberer());
+            case "-s", "--scratch-frames" -> processors.add(new FrameScratcher());
+            case "-f", "--flicker-frames" -> processors.add(new FrameFlickerer());
+            case "-w", "--black-and-white"-> processors.add(new FrameBlackAndWhiter());
+            case "-y", "--yellow-frames"  -> processors.add(new FrameYellower());
+            case "-v", "--vignette-frames"-> processors.add(new FrameVignetter());
+            case "-d", "--dust-frames"    -> processors.add(new FrameDuster());
+            case "-j", "--jitter-frames"  -> processors.add(new FrameJitterer());
+            case "-m", "--mottle-frames"  -> processors.add(new FrameMottler());
+            case "-b", "--bleed-frames"   -> processors.add(new FrameBleeder());
+            case "-p", "--pepper-frames"  -> processors.add(new FramePepperer());
+            default -> errorMessage = "Unknown option: " + flag;
+        }
     }
 }
