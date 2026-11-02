@@ -42,7 +42,7 @@ public class SubtitleService {
 		
 		// Call OpenAI API, turning JSON to WhisperResponse
 		return restClient.post()
-				.uri("/audio/transcription")
+				.uri("/audio/transcriptions")
 				.header("Authorization", "Bearer " + apiKey)
 				.contentType(MediaType.MULTIPART_FORM_DATA)
 				.body(body)
