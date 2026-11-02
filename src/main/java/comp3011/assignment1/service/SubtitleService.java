@@ -21,10 +21,12 @@ public class SubtitleService {
 	private final String apiKey;
 	private static final double NO_SPEECH_LIMIT = 0.6;
 	private static final double LOGPROB_LIMIT = -1;
+	private final UsageService usageService;
 	
-	public SubtitleService() {
+	public SubtitleService(UsageService usageService) {
 		this.apiKey = System.getenv("OPENAI_API_KEY"); // Get Key from OS
 		this.restClient = RestClient.builder().baseUrl("https://api.openai.com/v1").build();
+		this.usageService = usageService;
 	}
 	public WhisperResponse getSubtitles(byte[] audioBytes, String filename) {
 		logger.info("Transcribe for file: {}", filename);
@@ -52,6 +54,10 @@ public class SubtitleService {
 				.contentType(MediaType.MULTIPART_FORM_DATA)
 				.body(body)
 				.retrieve().body(WhisperResponse.class);
+		if(response.usage != null) {
+			usageService.addSeconds(response.usage.seconds);
+			logger.info("Usage: +{}s, total {}s", response.usage.seconds, usageService.getTotalSeconds());
+		}
 		// Filter only real speech
 		List<WhisperSegment> keep = new ArrayList<>();
 		for (WhisperSegment seg : response.segments) {
