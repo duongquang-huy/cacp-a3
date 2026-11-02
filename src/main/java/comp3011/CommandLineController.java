@@ -34,7 +34,8 @@ public class CommandLineController {
     private File videoFile;
     private String errorMessage;
     private final List<FrameProcessor> processors = new ArrayList<>();
-
+    private FrameSubtitler subtitleProcessor; // null unless has -S
+    
     public CommandLineController(String[] args) {
         this.args = args.clone();
         parse();
@@ -74,6 +75,11 @@ public class CommandLineController {
         return errorMessage == null && videoFile != null;
     }
     
+    /// null unless has -S
+    public FrameSubtitler getSubtitleProcessor() {
+    	return subtitleProcessor;
+    }
+    
     // Add new options
     private void parse() {
         List<String> videoFiles = new ArrayList<>();
@@ -110,6 +116,9 @@ public class CommandLineController {
                 processors.add(new FrameBleeder()); 
             } else if ("-p".equals(arg) || "--pepper-frames".equals(arg)) {
                 processors.add(new FramePepperer());
+            // New Subtitle Parse
+            }else if("-S".equals(arg) || "--subtitle-frames".equals(arg)) {
+            	subtitleProcessor = new FrameSubtitler();
             } else if (arg.startsWith("-") && arg.length() > 2 && !arg.startsWith("--")) {
                 // Combined short flags: -sfbn = -s -f -b -n
                 for (int i = 1; i < arg.length(); i++) {
@@ -121,7 +130,10 @@ public class CommandLineController {
                 videoFiles.add(arg);
             }
         }
-
+        // Sub always drawn last
+        if(subtitleProcessor != null) {
+        	processors.add(subtitleProcessor);
+        }
         if (videoFiles.size() > 1) {
             errorMessage = "Usage: VideoPlayer [options] [video-file]";
         } else if (videoFiles.size() == 1) {
@@ -168,6 +180,7 @@ public class CommandLineController {
         System.out.println("  -m, --mottle-frames    Add cloudy emulsion mottling");
         System.out.println("  -b, --bleed-frames     Bleed light into frames");
         System.out.println("  -p, --pepper-frames    Pepper frames with dark spots/blotches");
+        System.out.println("  -S, --subtitle-frames  Show speech-to-text subtitles");
         System.out.println();
         System.out.println("Frame processors are applied in command-line order and may be repeated.");
         System.out.println("Example: -nssnfwyvdjmbp numbers, scratches twice, numbers again, flickers,");
@@ -197,6 +210,8 @@ public class CommandLineController {
             case "-m", "--mottle-frames"  -> processors.add(new FrameMottler());
             case "-b", "--bleed-frames"   -> processors.add(new FrameBleeder());
             case "-p", "--pepper-frames"  -> processors.add(new FramePepperer());
+            // Subtitle
+            case "-S", "--subtitle-frames" -> subtitleProcessor = new FrameSubtitler();
             default -> errorMessage = "Unknown option: " + flag;
         }
     }
