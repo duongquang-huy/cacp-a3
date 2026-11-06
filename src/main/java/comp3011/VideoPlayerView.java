@@ -4,7 +4,7 @@
  * 
  * Authors:
  *   1. Simon Ratcliffe, in collaboration with GPT-5.6 Terra
- *   2. <student name and student number insert here upon modification>
+ *   2. Duong Quang Huy a2950659 
  *
  * Copyright 2026 Simon Ratcliffe
  */
@@ -57,6 +57,7 @@ public class VideoPlayerView {
     private final Button forwardFiveButton;
     private final Button stopButton;
     private final Button audioButton;
+    private final Button subtitleButton; // Button for subtitle
 
     public VideoPlayerView() {
         imageView.setPreserveRatio(true);
@@ -75,6 +76,7 @@ public class VideoPlayerView {
         forwardFiveButton = iconButton(createLoopIcon(true, "5"));
         stopButton = iconButton(createStopIcon());
         audioButton = iconButton(createAudioIcon(false));
+        subtitleButton = iconButton(new Label("CC")); // Button for subtitle: [CC]
         setPlaybackControlsDisabled(true);
 
         HBox controls = new HBox(
@@ -85,6 +87,7 @@ public class VideoPlayerView {
                 forwardFiveButton,
                 stopButton,
                 audioButton,
+                subtitleButton,
                 statusLabel);
 
         controls.setPadding(new Insets(10));
@@ -125,6 +128,14 @@ public class VideoPlayerView {
 
     public Button getAudioButton() {
         return audioButton;
+    }
+    
+    public Button getSubtitleButton() {
+        return subtitleButton;
+    }
+    public void showSubtitlesEnabled(boolean subtitlesEnabled) {
+    	// Faded when turning off
+    	subtitleButton.setOpacity(subtitlesEnabled ? 1 : 0.4);
     }
 
     public void setStatus(String status) {
@@ -169,6 +180,7 @@ public class VideoPlayerView {
         setButtonTooltip(forwardFiveButton, "[RIGHT]");
         setButtonTooltip(stopButton, "[ESC]");
         setButtonTooltip(audioButton, "[A]");
+        setButtonTooltip(subtitleButton, "[S]");
     }
 
     private void setButtonTooltip(Button button, String text) {

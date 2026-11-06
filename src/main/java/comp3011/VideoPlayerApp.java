@@ -46,6 +46,7 @@ public class VideoPlayerApp extends Application {
         controller = new VideoPlayerController(
                 commandLineController.isAudioRequested(),
                 commandLineController.getFrameProcessors(), // Pass processors from command line to model
+                commandLineController.getSubtitleProcessor(),
                 this::setVideoSize);
 
         Scene scene = new Scene(controller.getView().getRoot());

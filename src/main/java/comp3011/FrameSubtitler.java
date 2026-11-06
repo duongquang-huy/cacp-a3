@@ -10,9 +10,13 @@ public class FrameSubtitler extends FrameProcessor {
 	private static final int BOX_HEIGHT = 40; // height of box
 	private static final int BOTTOM_MARGIN = 10; // gap between box and bottom
 	private String preText = ""; // Previous text, only print when text changes
+	private volatile boolean enabled = true; // On/Off switch sub button
 
 	@Override
     public void process(Frame frame, InfoFrame info) throws Exception {
+		if (!enabled) {
+			return; // sub turned off
+		}
         if (frame.image == null || frame.image.length == 0 || frame.image[0] == null) {
             return;
         }
@@ -32,6 +36,13 @@ public class FrameSubtitler extends FrameProcessor {
         }
         darkenBox(pixels);
         
+	}
+	
+	public void setEnabled(boolean enabled) {
+		this.enabled = enabled;
+	}
+	public boolean isEnabled() {
+		return enabled;
 	}
 	
 	// Fake sub for testing, new/3s

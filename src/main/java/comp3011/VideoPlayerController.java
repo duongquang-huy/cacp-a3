@@ -31,12 +31,15 @@ public class VideoPlayerController {
     private final VideoPlayerModel model;
     private final VideoPlayerView view;
     private final BiConsumer<Integer, Integer> videoSizeChangedHandler;
-
+    private final FrameSubtitler subtitler; // null when -S not given
+    
     public VideoPlayerController(
             boolean audioEnabled,
             List<FrameProcessor> frameProcessors, // Passed processors from VideoPlayerApp
+            FrameSubtitler subtitler,
             BiConsumer<Integer, Integer> videoSizeChangedHandler) {
         this.view = new VideoPlayerView();
+        this.subtitler = subtitler;
         this.videoSizeChangedHandler = videoSizeChangedHandler;
         model = new VideoPlayerModel(
                 audioEnabled,
@@ -53,6 +56,7 @@ public class VideoPlayerController {
         view.getForwardFiveButton().setOnAction(_ -> forwardFiveSeconds());
         view.getStopButton().setOnAction(_ -> stopAndExit());
         view.getAudioButton().setOnAction(_ -> toggleAudioOutput());
+        view.getSubtitleButton().setOnAction(_ -> toggleSubtitles());
         view.showAudioEnabled(model.isAudioOutputEnabled());
     }
 
@@ -76,6 +80,9 @@ public class VideoPlayerController {
             } else if (event.getCode() == KeyCode.A) {
                 toggleAudioOutput();
                 event.consume();
+            }else if(event.getCode() == KeyCode.S) { // S key = CC button
+            	toggleSubtitles();
+            	event.consume();
             }
         });
     }
@@ -111,6 +118,16 @@ public class VideoPlayerController {
 
     private void toggleAudioOutput() {
         model.toggleAudioOutput();
+    }
+    
+    // Turn subtitles on/off 
+    private void toggleSubtitles() {
+    	if (subtitler == null) {
+    		return; // no -S => no toggle
+    	}
+    	boolean on = !subtitler.isEnabled();
+    	subtitler.setEnabled(on);
+    	view.showSubtitlesEnabled(on);
     }
 
     private void stopAndExit() {
