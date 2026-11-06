@@ -18,7 +18,7 @@ import javafx.scene.Scene;
 import javafx.scene.image.Image;
 import javafx.scene.input.KeyCode;
 import javafx.scene.input.KeyEvent;
-
+import java.util.ArrayList;
 /**
  * The controller part of the video player model-view-controller architecture.
  * 
@@ -40,6 +40,14 @@ public class VideoPlayerController {
             BiConsumer<Integer, Integer> videoSizeChangedHandler) {
         this.view = new VideoPlayerView();
         this.subtitler = subtitler;
+        // TEMP test for step 10A (remove in 10C)
+        if (subtitler != null) {
+            List<Subtitle> test = new ArrayList<>();
+            test.add(new Subtitle("First test line", 1_000_000, 4_000_000));
+            test.add(new Subtitle("Very short line, shown 1 second", 6_000_000, 6_200_000));
+            test.add(new Subtitle("Very long line, cut to 7 seconds", 10_000_000, 30_000_000));
+            subtitler.addSubtitles(test);
+        }
         this.videoSizeChangedHandler = videoSizeChangedHandler;
         model = new VideoPlayerModel(
                 audioEnabled,

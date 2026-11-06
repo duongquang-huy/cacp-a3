@@ -20,6 +20,10 @@ public class FrameSubtitler extends FrameProcessor {
     private volatile boolean enabled = true; // on/of subtitle switch
     private String lastText = null;
     private BufferedImage lastImage = null;
+    // All subs received from the server
+    private final List<Subtitle> subtitles = new ArrayList<>();
+    private static final long MIN_SHOW_US = 1000000; // show each line at least 1 second
+    private static final long MAX_SHOW_US = 7000000; // max: 7 seconds
 
 	
     @Override
@@ -56,20 +60,26 @@ public class FrameSubtitler extends FrameProcessor {
 		return enabled;
 	}
 	
-	// Fake sub for testing, new/3s
-	private String getTextAt(long timestampUs) {
-		long second = timestampUs/1_000_000;
-		long index = second/3;
-		if(index % 4 == 3) {
-			return null;
+	public synchronized void addSubtitles(List<Subtitle> newSubtitles) {
+		for(Subtitle s: newSubtitles) {
+			long length = s.endUs - s.startUs;
+			if(length < MIN_SHOW_US) {
+				s.endUs = s.startUs + MIN_SHOW_US; // make the sub 1 sec if too short
+			}
+			if (length > MAX_SHOW_US) {
+				s.endUs = s.startUs + MAX_SHOW_US; // make the sub shorter if too long
+			}
+			subtitles.add(s);
 		}
-		if(index % 3 == 0) {
-			return "Hello Handsome Huy";
-		}else if(index % 4 == 1) {
-			return "The amazing world of Gumball, hey Darwin, Richard, Anais, Nicole";
-		}else{
-			return "Just because I've been unable to talk does not mean that I've been unable to see anything at all";
+	}
+	
+	private synchronized String getTextAt(long timestampUs) {
+		for(Subtitle s:subtitles) {
+			if(timestampUs >= s.startUs && timestampUs < s.endUs) {
+				return s.text;
+			}
 		}
+		return null; // If no sub
 	}
 	
 	// Split the text to lines of max 42 char/lines, max 2 lines
