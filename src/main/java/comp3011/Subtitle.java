@@ -1,5 +1,8 @@
 package comp3011;
-
+/* 
+ * Authors:
+ *  Duong Quang Huy a2950659
+ */
 
 // Sub line and show time(milisecond)
 public class Subtitle {
