@@ -122,6 +122,11 @@ public class VideoPlayerModel {
 //        frameProcessors.add(new FrameJitterer());
 //        frameProcessors.add(new FrameNumberer());
     }
+    
+    // A3: where the video is now, used to move the sub thread after a seek
+    public long getCurrentTimestampUs() {
+    	return currentTimestampUs;
+    }
 
     public void play(File file) {
         videoFile = file;

@@ -122,10 +122,12 @@ public class VideoPlayerController {
 
     private void startOver() {
         model.startOver();
+        moveFetcher();
     }
 
     private void backFiveSeconds() {
         model.backFiveSeconds();
+        moveFetcher();
     }
 
     private void togglePause() {
@@ -134,8 +136,17 @@ public class VideoPlayerController {
 
     private void forwardFiveSeconds() {
         model.forwardFiveSeconds();
+        moveFetcher();
     }
-
+    
+    // A3: after a seek, tell the subtitle thread where is the vids now
+    private void moveFetcher() {
+    	if(fetcher!=null) {
+    		fetcher.seekTo(model.getCurrentTimestampUs());
+    	}
+    }
+    
+    
     private void toggleAudioOutput() {
         model.toggleAudioOutput();
     }

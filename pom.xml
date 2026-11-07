@@ -119,5 +119,31 @@
         </plugins>
       </build>
     </profile>
+    <profile>
+      <id>server-jar</id>
+      <build>
+        <plugins>
+          <plugin>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-maven-plugin</artifactId>
+            <version>4.1.1</version>
+            <configuration>
+              <mainClass>comp3011.assignment1.Assignment1Application</mainClass>
+              <!-- The server does not need the video libraries: keeps the jar small -->
+              <excludeGroupIds>org.openjfx,org.bytedeco</excludeGroupIds>
+            </configuration>
+            <executions>
+              <execution>
+                <goals>
+                  <goal>repackage</goal>
+                </goals>
+              </execution>
+            </executions>
+          </plugin>
+        </plugins>
+      </build>
+    </profile>
   </profiles>
 </project>
+
+

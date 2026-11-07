@@ -12,7 +12,9 @@ import java.io.File;
 import java.io.IOException;
 import java.nio.ShortBuffer;
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 
 import javax.sound.sampled.AudioFileFormat;
 import javax.sound.sampled.AudioFormat;
@@ -38,13 +40,14 @@ public class SubtitleFetcher {
     private static final String SERVER_URL = "http://localhost:8080/api/v1/subtitles";
     private static final int SAMPLE_RATE = 16000;
     private static final int CHUNK_SECONDS = 10; // length of a piece sent to server
-
     private final File videoFile;
     private final FrameSubtitler subtitler;
     private final RestClient restClient = RestClient.create();
 
     private Thread thread;
     private volatile boolean running = false;
+    private long seekRequestUs = -1; // where jump to, -1 = no jump
+    private final Set<Long> doneSeconds = new HashSet<>();
 
     public SubtitleFetcher(File videoFile, FrameSubtitler subtitler) {
         this.videoFile = videoFile;
@@ -64,6 +67,34 @@ public class SubtitleFetcher {
         if (thread != null) {
             thread.interrupt();
         }
+    }
+    
+    
+    // Called by the FX thread after the user seeks
+    public synchronized void seekTo(long timestampUs) {
+    	long second = timestampUs/1000000;
+    	if(doneSeconds.contains(second)) {
+    		return; // already have sub, keep going as before
+    	}
+    	seekRequestUs = timestampUs; // ask fetcher thread to jump here
+    }
+    
+    //Called by the fetcher thread
+    private synchronized long takeSeekRequest() {
+    	long jump = seekRequestUs = -1;
+    	return jump;
+    }
+    
+    private synchronized void markDone(long startUs, long lengthUs) {
+    	long firstSec = startUs/1000000;
+    	long lastSec = (startUs/lengthUs)/1000000;
+    	for(long s = firstSec; s<lastSec; s++ ) {
+    		doneSeconds.add(s);
+    	}
+    }
+    
+    private synchronized boolean isDone(long startUs) {
+    	return doneSeconds.contains(startUs/1000000);
     }
 
     // Read audio from the video and split it into chunks
@@ -86,6 +117,15 @@ public class SubtitleFetcher {
             long chunkStartUs = 0;
 
             while (running) {
+                // User seek to a place with no subtitles yet? Jump there
+                long jump = takeSeekRequest();
+                if (jump != -1) {
+                    grabber.setTimestamp(jump); // move the audio reader
+                    chunkStartUs = jump;        // the new piece starts here
+                    sampleCount = 0;            // throw away the half-collected piece
+                    audioData.reset();
+                    System.out.println("Subtitle fetcher jumped to " + (jump / 1_000_000) + "s");
+                }
                 Frame frame = grabber.grabSamples();
 
                 if (frame == null) {
@@ -110,10 +150,15 @@ public class SubtitleFetcher {
 
                 // Send audio after collecting 10 seconds
                 if (sampleCount >= SAMPLE_RATE * CHUNK_SECONDS) {
-                    sendPiece(audioData.toByteArray(), chunkStartUs);
+                	long lengthUs = sampleCount * 1_000_000L / SAMPLE_RATE;
 
-                    chunkStartUs += sampleCount * 1_000_000L / SAMPLE_RATE;
+                    if (!isDone(chunkStartUs)) {           // skip pieces we already have
+                        if (sendPiece(audioData.toByteArray(), chunkStartUs)) {
+                            markDone(chunkStartUs, lengthUs);
+                        }
+                    }
 
+                    chunkStartUs += lengthUs;
                     sampleCount = 0;
                     audioData.reset();
                 }
@@ -130,7 +175,7 @@ public class SubtitleFetcher {
     }
 
     // Send audio to the server and get subtitles
-    private void sendPiece(byte[] audioData, long chunkStartUs) {
+    private boolean sendPiece(byte[] audioData, long chunkStartUs) {
         try {
             byte[] wavData = makeWav(audioData);
 
@@ -153,7 +198,7 @@ public class SubtitleFetcher {
 
             if (response == null || response.segments == null) {
                 System.out.println("No subtitles returned");
-                return;
+                return false;
             }
 
             List<Subtitle> subtitles = new ArrayList<>();
@@ -175,9 +220,11 @@ public class SubtitleFetcher {
             subtitler.addSubtitles(subtitles);
 
             System.out.println("Received " + subtitles.size() + " subtitles");
+            return true;
 
         } catch (Exception e) {
             System.out.println("Failed to fetch subtitles: " + e.getMessage());
+            return false;
         }
     }
 
