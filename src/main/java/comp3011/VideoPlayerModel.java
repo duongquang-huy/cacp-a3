@@ -46,7 +46,8 @@ public class VideoPlayerModel {
     private static final long NO_SEEK_REQUEST = -1; // Sentinel value used when no seek position is active.
     private static final long FIVE_SECONDS_US = 5_000_000L;
     private static final long AUDIO_LEAD_NS = 30_000_000L;
-
+    private static final PreparedFrame END_OF_VIDEO = new PreparedFrame(null, -1, 0, 0, 0, 0);
+    
     private final List<FrameProcessor> frameProcessors;
     private final Queue<PendingAudio> pendingAudio = new ArrayDeque<>();
     private final BiConsumer<Integer, Integer> videoSizeChangedHandler;
@@ -319,7 +320,6 @@ public class VideoPlayerModel {
         while (playbackOpen) {
             Frame frame = grabFrame();
             if (frame == null) {
-                finishPlayback();
                 return null;
             }
 
@@ -401,6 +401,13 @@ public class VideoPlayerModel {
         if (preparedFrame == null && !pauseRequested) {
         	preparedFrame = frameQueue.poll(); // Get unlocked frame and return null if queue is empty
         }
+        
+     // A3: reached the end marker: every real frame has been shown, finish now (on the FX thread)
+        if (preparedFrame == END_OF_VIDEO) {
+            preparedFrame = null;
+            finishPlayback();
+            return;
+        }
 
         // Task (3). We'll try and be nice to the GUI event loop here by queueing the prepareNextFrame call rather than
         // hogging the thread and doing it here, hence the tricky callback and use of prepareNextFrameQueued. Feel free
@@ -433,18 +440,18 @@ public class VideoPlayerModel {
         relativeSeekBaseUs = NO_SEEK_REQUEST;
 
         // Dump some logging to the console once per second so that real time performance can be monitored.
-        if (intFrameRate > 0 && frame.frameNumber() % intFrameRate == 0) {
-            long remainingUs = (frame.targetTimeNs() - frame.preparedAtNs()) / 1_000L;
-            if (remainingUs < 0) {
-                System.out.printf("Frame headroom is \u001B[31m%5dus\u001B[0m out of %dus spare.%n",
-                        remainingUs,
-                        videoFrameDurationUs);
-            } else {
-                System.out.printf("Frame headroom is \u001B[32m%5dus\u001B[0m out of %dus spare.%n",
-                        remainingUs,
-                        videoFrameDurationUs);
-            }
-        }
+//        if (intFrameRate > 0 && frame.frameNumber() % intFrameRate == 0) {
+//            long remainingUs = (frame.targetTimeNs() - frame.preparedAtNs()) / 1_000L;
+//            if (remainingUs < 0) {
+//                System.out.printf("Frame headroom is \u001B[31m%5dus\u001B[0m out of %dus spare.%n",
+//                        remainingUs,
+//                        videoFrameDurationUs);
+//            } else {
+//                System.out.printf("Frame headroom is \u001B[32m%5dus\u001B[0m out of %dus spare.%n",
+//                        remainingUs,
+//                        videoFrameDurationUs);
+//            }
+//        }
 
         notifyFrameReady(frame.image());
     }
@@ -691,7 +698,7 @@ public class VideoPlayerModel {
     			// Decode and process next frame
     			PreparedFrame frame = readNextVideoFrame(); // decode and apply effect
     			if(frame == null) {
-    				finishPlayback();
+    				frameQueue.put(END_OF_VIDEO);
     				break;
     			}
     			// Put frame in queue

@@ -11,6 +11,7 @@ import java.io.ByteArrayOutputStream;
 import java.io.File;
 import java.io.IOException;
 import java.nio.ShortBuffer;
+import java.time.Duration;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
@@ -26,6 +27,7 @@ import org.bytedeco.javacv.Frame;
 import org.bytedeco.javacv.FrameGrabber;
 import org.springframework.core.io.ByteArrayResource;
 import org.springframework.http.MediaType;
+import org.springframework.http.client.SimpleClientHttpRequestFactory;
 import org.springframework.util.LinkedMultiValueMap;
 import org.springframework.util.MultiValueMap;
 import org.springframework.web.client.RestClient;
@@ -42,8 +44,15 @@ public class SubtitleFetcher {
     private static final int CHUNK_SECONDS = 10; // length of a piece sent to server
     private final File videoFile;
     private final FrameSubtitler subtitler;
-    private final RestClient restClient = RestClient.create();
+    private final RestClient restClient = makeRestClient();
 
+    // Never wait forever: max 5s to connect to our server, max 60s for its answer
+    private static RestClient makeRestClient() {
+        SimpleClientHttpRequestFactory factory = new SimpleClientHttpRequestFactory();
+        factory.setConnectTimeout(Duration.ofSeconds(5));
+        factory.setReadTimeout(Duration.ofSeconds(60));
+        return RestClient.builder().requestFactory(factory).build();
+    }
     private Thread thread;
     private volatile boolean running = false;
     private long seekRequestUs = -1; // where jump to, -1 = no jump
@@ -81,13 +90,14 @@ public class SubtitleFetcher {
     
     //Called by the fetcher thread
     private synchronized long takeSeekRequest() {
-    	long jump = seekRequestUs = -1;
+    	long jump = seekRequestUs;
+    	seekRequestUs = -1;
     	return jump;
     }
     
     private synchronized void markDone(long startUs, long lengthUs) {
     	long firstSec = startUs/1000000;
-    	long lastSec = (startUs/lengthUs)/1000000;
+    	long lastSec = (startUs+lengthUs)/1000000;
     	for(long s = firstSec; s<lastSec; s++ ) {
     		doneSeconds.add(s);
     	}
@@ -150,10 +160,16 @@ public class SubtitleFetcher {
 
                 // Send audio after collecting 10 seconds
                 if (sampleCount >= SAMPLE_RATE * CHUNK_SECONDS) {
-                	long lengthUs = sampleCount * 1_000_000L / SAMPLE_RATE;
+                    long lengthUs = sampleCount * 1_000_000L / SAMPLE_RATE;
+                    byte[] piece = audioData.toByteArray();
 
-                    if (!isDone(chunkStartUs)) {           // skip pieces we already have
-                        if (sendPiece(audioData.toByteArray(), chunkStartUs)) {
+                    if (!isDone(chunkStartUs)) { // skip pieces we already have
+                        // Keep trying until it works: the network may be down for a while
+                        while (running && !sendPiece(piece, chunkStartUs)) {
+                            System.out.println("Retrying in 3 seconds...");
+                            Thread.sleep(3000);
+                        }
+                        if (running) {
                             markDone(chunkStartUs, lengthUs);
                         }
                     }

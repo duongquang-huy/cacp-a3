@@ -9,6 +9,8 @@ import org.springframework.util.LinkedMultiValueMap;
 import org.springframework.util.MultiValueMap;
 import org.springframework.core.io.ByteArrayResource;
 import org.springframework.http.MediaType;
+import org.springframework.http.client.SimpleClientHttpRequestFactory;
+import java.time.Duration;
 import java.util.ArrayList;
 import java.util.List;
 import comp3011.assignment1.model.WhisperSegment;
@@ -25,7 +27,13 @@ public class SubtitleService {
 	
 	public SubtitleService(UsageService usageService) {
 		this.apiKey = System.getenv("OPENAI_API_KEY"); // Get Key from OS
-		this.restClient = RestClient.builder().baseUrl("https://api.openai.com/v1").build();
+		//max 10s to connect, max 30s for whisper to answer
+		SimpleClientHttpRequestFactory factory = new SimpleClientHttpRequestFactory();
+		factory.setConnectTimeout(Duration.ofSeconds(10));
+		factory.setReadTimeout(Duration.ofSeconds(30));
+		this.restClient = RestClient.builder()
+				.requestFactory(factory)
+				.baseUrl("https://api.openai.com/v1").build();
 		this.usageService = usageService;
 	}
 	public WhisperResponse getSubtitles(byte[] audioBytes, String filename) {

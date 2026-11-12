@@ -14,6 +14,7 @@ import java.io.File;
 import java.util.List;
 import java.util.function.BiConsumer;
 
+import javafx.application.Platform;
 import javafx.scene.Scene;
 import javafx.scene.image.Image;
 import javafx.scene.input.KeyCode;
@@ -32,6 +33,7 @@ public class VideoPlayerController {
     private final BiConsumer<Integer, Integer> videoSizeChangedHandler;
     private final FrameSubtitler subtitler; // null when -S not given
     private SubtitleFetcher fetcher; // background thread that gets subtitles from the server
+    private File currentFile;
     
     public VideoPlayerController(
             boolean audioEnabled,
@@ -102,15 +104,22 @@ public class VideoPlayerController {
     public void play(File file) {
         view.setPlaybackControlsDisabled(false);
         model.play(file);
-        
-        // Start getting subtitles for video
-        if(subtitler != null) {
-        	if(fetcher != null) {
-        		fetcher.stop(); // stop old fetcher if there was one
-        	}
-        	fetcher = new SubtitleFetcher(file, subtitler);
-        	fetcher.start();
+        currentFile = file;
+
+        view.showSubtitlesEnabled(subtitler.isEnabled()); // button faded if off
+        if (subtitler.isEnabled()) {
+            startFetcher(); // -S given: start getting subtitles now
         }
+    }
+    
+ // Start (or restart) the background thread that gets subtitles
+    private void startFetcher() {
+        if (fetcher != null) {
+            fetcher.stop();
+        }
+        fetcher = new SubtitleFetcher(currentFile, subtitler);
+        fetcher.start();
+        fetcher.seekTo(model.getCurrentTimestampUs()); // begin where the video is now
     }
 
     public void shutdown() {
@@ -153,12 +162,14 @@ public class VideoPlayerController {
     
     // Turn subtitles on/off 
     private void toggleSubtitles() {
-    	if (subtitler == null) {
-    		return; // no -S => no toggle
-    	}
-    	boolean on = !subtitler.isEnabled();
-    	subtitler.setEnabled(on);
-    	view.showSubtitlesEnabled(on);
+        boolean nowOn = !subtitler.isEnabled();
+        subtitler.setEnabled(nowOn);
+        view.showSubtitlesEnabled(nowOn);
+
+        // First time subtitles are turned on (started without -S): start getting them
+        if (nowOn && fetcher == null && currentFile != null) {
+            startFetcher();
+        }
     }
 
     private void stopAndExit() {
@@ -175,15 +186,20 @@ public class VideoPlayerController {
     }
 
     private void onStatusChanged(String status) {
-        view.setStatus(status);
+        // May be called from the decode thread (end of video, USB removed):
+        // hand the UI change to the FX thread
+        Platform.runLater(() -> view.setStatus(status));
     }
 
     private void onPlaybackStateChanged(boolean playing, boolean paused) {
-        if (playing && !paused) {
-            view.showPauseAction();
-        } else {
-            view.showPlayAction();
-        }
+        // May be called from the decode thread: hand the UI change to the FX thread
+        Platform.runLater(() -> {
+            if (playing && !paused) {
+                view.showPauseAction();
+            } else {
+                view.showPlayAction();
+            }
+        });
     }
 
     private void onAudioOutputStateChanged(boolean audioOutputEnabled) {

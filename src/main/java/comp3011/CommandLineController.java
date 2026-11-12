@@ -34,7 +34,8 @@ public class CommandLineController {
     private File videoFile;
     private String errorMessage;
     private final List<FrameProcessor> processors = new ArrayList<>();
-    private FrameSubtitler subtitleProcessor; // null unless has -S
+    private final FrameSubtitler subtitleProcessor = new FrameSubtitler(); // null unless has -S
+    private boolean subtitlesOnAtStart = false; // true when -S is given
     
     public CommandLineController(String[] args) {
         this.args = args.clone();
@@ -118,7 +119,7 @@ public class CommandLineController {
                 processors.add(new FramePepperer());
             // New Subtitle Parse
             }else if("-S".equals(arg) || "--subtitle-frames".equals(arg)) {
-            	subtitleProcessor = new FrameSubtitler();
+            	subtitlesOnAtStart = true;
             } else if (arg.startsWith("-") && arg.length() > 2 && !arg.startsWith("--")) {
                 // Combined short flags: -sfbn = -s -f -b -n
                 for (int i = 1; i < arg.length(); i++) {
@@ -131,9 +132,8 @@ public class CommandLineController {
             }
         }
         // Sub always drawn last
-        if(subtitleProcessor != null) {
-        	processors.add(subtitleProcessor);
-        }
+        subtitleProcessor.setEnabled(subtitlesOnAtStart);
+        processors.add(subtitleProcessor);
         if (videoFiles.size() > 1) {
             errorMessage = "Usage: VideoPlayer [options] [video-file]";
         } else if (videoFiles.size() == 1) {
@@ -211,7 +211,7 @@ public class CommandLineController {
             case "-b", "--bleed-frames"   -> processors.add(new FrameBleeder());
             case "-p", "--pepper-frames"  -> processors.add(new FramePepperer());
             // Subtitle
-            case "-S", "--subtitle-frames" -> subtitleProcessor = new FrameSubtitler();
+            case "-S", "--subtitle-frames" -> subtitlesOnAtStart = true;
             default -> errorMessage = "Unknown option: " + flag;
         }
     }
